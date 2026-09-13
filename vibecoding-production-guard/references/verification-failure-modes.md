@@ -1,7 +1,7 @@
 # Chyby detekce — jak selhává audit a verifikace samotná
 
 Defect-classes popisují, jak vznikají chyby *v kódu*. Tahle reference popisuje, jak selhává
-*jejich hledání* — ať už audit běží přes subagenty, nebo přes tebe. Všech pět tříd se
+*jejich hledání* — ať už audit běží přes subagenty, nebo přes tebe. Všech sedm tříd se
 opakovaně objevuje v praxi multi-agentních auditů s adversariální verifikací nálezů.
 
 **Řídící princip — asymetrie falešné jistoty:** chyby detekce nejsou náhodný šum; systematicky
@@ -9,6 +9,11 @@ táhnou k falešné jistotě v obou směrech. **Falešné PASS je nebezpečněj�
 falešný nález zabije verifikační krok, ale falešné PASS už nezachytí nikdo. Architektura
 detekce proto musí být asymetrická: nálezy prohnat skeptiky, ale „čisto" nikdy nepřijmout
 bez důkazu práce a funkčního negativního testu.
+
+**Druhý princip — nejdražší chyba auditu není přehlédnutý nález, ale nález, který není
+pravda.** Přehlédnutí najde příští běh. Nepravdivý nález stojí ownera refaktoring, který nebyl
+potřeba, a auditora důvěru, kterou už nezíská zpátky. Proto se zapisují i pasti, do kterých
+detekce spadla (§6), a každý nález nese úroveň doložení (§7).
 
 ## 1. Degenerovaný výstup, který projde validací
 
@@ -25,6 +30,9 @@ Odhalí se jen čtením výstupu očima; dimenze se pak musí přeběhnout samos
 - Strukturální validita ≠ sémantická validita. Schema si vynuť, ale výstup vždy čti.
 - „Nic jsem nenašel" musí nést **důkaz práce**: co konkrétně bylo prošlé (soubory, tabulky,
   dotazy). Bez toho je nulový výsledek nulová informace, ne zelená.
+- Nulový nález s důkazem práce je naopak plnohodnotný výsledek: dostává číslo v registru
+  jako „prověřeno bez nálezu" (audit-output.md). Bez toho není vidět rozsah auditu a příští
+  běh to dělá znovu.
 - Žádné tiché stropy: pokud detekce něco vzorkovala nebo ořezala (top-N souborů, jen část
   schématu), musí to říct — jinak se ořez čte jako pokrytí.
 
@@ -38,11 +46,22 @@ ne na pravdivost; forma nálezu nekoreluje s jeho realitou.
 s instrukcí „vyvrať to"). Bez ní remedy plán obsahuje fixy neexistujících děr — a pálí
 důvěru ownera na nálezy, které reálné byly.
 
+**Ilustrativní scénář (oba směry):** hledání textového vzoru ve zdrojácích funkcí místo
+posouzení sémantiky dalo nejdřív „ochranu má jen malá část funkcí" (měla ji většina, jen
+psanou jinak) a pak „nález je opravený" (nebyl — hledaný výraz seděl v logovací hlášce).
+
 **Protiopatření:**
 
 - Každý nález před remediací **reprodukuj** (dotaz, negativní test, proof-of-concept), nebo
   ho prožeň nezávislým skeptikem, jehož úkolem je vyvracet, ne potvrzovat.
 - Skeptik musí být slepý k závěru finderu — dostane tvrzení a evidenci, ne jistotu.
+- **Vyhledávání v kódu hledá kandidáty, nikdy nepodává důkaz** — ani o nálezu, ani o opravě.
+  Každý kandidát se potvrzuje čtením nebo pokusem.
+- **První měření je kandidát, ne nález.** Nález vzniká až druhým, nezávislým způsobem ověření.
+- **Verifikuj opravy stejně jako nálezy.** Oprava se dokládá diferenčním testem proti
+  ponechanému orákulu: stará implementace vedle nové na stejných vstupech, včetně vstupu za
+  hranou, kde se stará láme. „Opraveno" bez diferenčního důkazu je stejně nedoložené jako
+  nález bez reprodukce.
 - Neopravuj nic jen na základě toho, že „to zní správně". Kritérium je reprodukce.
 
 ## 3. Ověření přítomnosti mechanismu místo jeho chování
@@ -56,12 +75,23 @@ strukturálním smokem — a funkční negativní test ukáže, že bypassuje ú
 DEFINER funkce je `current_user` vlastník, ne volající, takže bypass větev „pro systémové
 role" pustí každého. Fix = přepnout na INVOKER + trvalý invariant assert na `prosecdef`.
 
+**Druhý scénář — negativní test, který nedoletěl:** test ztraceného zápisu použil umělou
+hodnotu, kterou databáze odmítla constraintem. Výsledek „bez ztráty" vypadal jako PASS; po
+opravě na platnou hodnotu tentýž scénář selhal. Obrana „držela" jen proto, že k ní útok
+vůbec nedorazil.
+
 **Protiopatření:**
 
 - Ke každé obranné vrstvě patří **funkční negativní test**: pokus o akci, kterou má vrstva
   zakázat, provedený identitou, které ji má zakázat. PASS = akce selhala.
+- **Negativní test musí doložit, že zásah k obraně doletěl.** Pokud selže dřív (constraint,
+  validace, typ, chybějící oprávnění na jiné vrstvě), je PASS falešný. Kontrola: bez testované
+  obrany by tentýž zásah prošel (mutační ověření — obranu dočasně vypni v izolovaném
+  prostředí, nebo použij vstup, o kterém víš, že jinak projde).
 - Strukturální smoke (existence, konfigurace) je nutný, ne postačující. Verdikt „obrana
   drží" smí padnout jen z chování, ne z přítomnosti.
+- U pravidla, které „přece platí" (policy, CSS, konfigurační vrstva): změř výsledek; při
+  podezření vlož identické pravidlo na konec pořadí a změř, že se změnila právě jedna veličina.
 - Zvlášť u SECURITY DEFINER / service účtů / bypass větví: otestuj guard z perspektivy
   běžného přihlášeného útočníka, ne z perspektivy, kterou máš při vývoji po ruce.
 
@@ -74,16 +104,20 @@ flagne jako HIGH nález; v horším případě ho remediace „opraví" — a vy
 
 **Ilustrativní scénář:** always-true read policies jako vědomé pre-pilot rozhodnutí zapsané
 v ADR; stabilní datový klíč pod přejmenovaným UI labelem taky. Auditor bez těchto ADR obojí
-flagne jako defekt a „opraví" k regresi.
+flagne jako defekt a „opraví" k regresi. Podobně: tabulky bez FK, které používají ratifikovaný
+polymorfní vzor; číselníky, jejichž sloučení by zničilo referenční integritu.
 
 **Protiopatření:**
 
 - Audit prompty **groundovat v ADR + dokumentu invariantů** — decision recordy jsou strojově
   čitelná paměť záměru pro budoucí auditory; přesně proto se vedou.
 - Nález proti dokumentovanému rozhodnutí není defekt, ale podnět: „platí ADR-00NN ještě?"
-  Eskaluje se jako otázka ownerovi, ne jako položka remedy.
+  Eskaluje se jako **rozhodnutí** (audit-output.md) s odkazem na zdroj a s popisem ceny,
+  kterou nese — ne jako položka remedy.
 - Subagenti startují bez kontextu session — každý audit prompt nese relevantní ADR/invarianty
   explicitně, nebo je jeho verdikt o záměrných místech nedůvěryhodný.
+- Kapitola „co vypadá jako nález a není" patří do každého reportu; jinak se tentýž „nález"
+  objeví při příštím auditu znovu.
 
 ## 5. Slepota k druhotným efektům vlastní změny
 
@@ -105,6 +139,56 @@ u cizího kódu, vyrobená vlastníma rukama tentýž den. Odhalí ji mechanick�
   hardened stav živé DB, protože platformní default dává nové tabulce plné granty.)
 - Po každé vlastní dávce: „které počítadlo / pin / evidenci / baseline jsem právě zneplatnil?"
   Odpověď „žádné" chce vteřinu grep, ne pocit.
+
+## 6. Slepá skvrna měřicího nástroje
+
+**Mechanismus:** Audit je měřicí přístroj a má vlastní chybu. Sonda, harness nebo selektor
+pokrývá jen část jevu, a *absence signálu* se pak čte jako *absence selhání*. Na rozdíl od
+§1 tu není prázdný výstup agenta, ale neúplný vstup — nástroj nevidí, co má měřit, a neví to.
+
+**Zaznamenané pasti (každá vedla k chybnému závěru, než byla odhalena):**
+
+- Sonda sledovala jen kanál **odpovědí**. Požadavek odmítnutý bránou bez odpovědi (414 bez
+  CORS hlaviček) žádnou odpověď nevyvolal — závěr „žádná plocha neselhává", ve skutečnosti
+  selhávaly. Stejný důvod, proč tahle třída uniká i běžnému monitoringu.
+- Měření začínalo na úvodní ploše, která přesměrovává; její selhání se přičetlo každé měřené
+  ploše — „problém trefuje všechno", trefoval tři.
+- Testovací nástroj restartoval pracovní proces po každém pádu testu; výsledky agregované
+  v paměti přežily jen z posledního testu — neúplná sada vypadající jako úplná.
+- Odvozený ukazatel („počet vykreslených řádků" přes selektor) nepokrýval všechny typy
+  zobrazení — podezření na prázdnou plochu, která ve skutečnosti vykreslila tisíc řádků.
+- Profil generovaných dat kolidoval s obchodním pravidlem systému; část dat se tiše
+  nevygenerovala a všechny metriky nad nimi byly zkreslené.
+
+**Protiopatření:**
+
+- **Oba kanály.** Sleduj i selhané požadavky (bez odpovědi, přerušené, timeout), ne jen
+  odpovědi. Totéž platí pro produkční monitoring.
+- **Měř až po ustálení, přímo na cíli.** Naviguj rovnou na měřenou plochu; mezivýsledek
+  se nikdy necituje jako závěr.
+- **Zapisuj průběžně na disk**, nikdy neagreguj v paměti procesu, který se může restartovat.
+- **Závěry stav na primárních veličinách** (počty požadavků, objemy dat, snímky obrazovky),
+  ne na odvozených ukazatelích. Odvozený ukazatel se před použitím kalibruje proti primárnímu.
+- **Po vygenerování dat porovnej skutečné počty s očekávanými** a odchylku popiš v reportu,
+  nepřecházej ji.
+- **Odhad je odhad**: v reportu ho označ a při pozdějším přesném měření dohledej, jak vyšel.
+- **Sbírej surová data štědře, vyhodnocuj cíleně** a surová data nemaž: nálezy s nejvyšší
+  závažností často vypadnou z dat sbíraných k jiné otázce.
+
+## 7. Důkazní žebřík — co znamená „doloženo"
+
+Každý nález i každá oprava se zařadí do jedné ze tří úrovní. Bez zařazení není nález
+doložený, jen tvrzený.
+
+| Úroveň | Co znamená | Kdy stačí |
+|---|---|---|
+| **Změřeno** | Existuje číslo z opakovatelného měření a je uvedeno, jak vzniklo. | Většina nálezů. Výchozí úroveň. |
+| **Reprodukováno** | Existuje postup, kterým se chování vyvolá na vyžádání — u vad se stopou před opravou i po ní. | **Povinné** u všeho s bezpečnostním nebo finančním dopadem. |
+| **Doloženo experimentem** | Příčina je izolována zásahem, po kterém se změní právě jedna veličina. | Tam, kde hrozí záměna příčiny s korelací (tři pravděpodobně vypadající příčiny, jedna skutečná). |
+
+Nejvýš stojí experiment a vyplácí se právě u „pravidlo existuje a neplatí": teprve vložení
+identického pravidla na konec pořadí a změření, že se změnila jediná veličina, oddělí
+skutečnou příčinu od pravděpodobných.
 
 ## Provozní poznámka — degradace detektoru za běhu
 

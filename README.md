@@ -7,7 +7,7 @@ Destilované vzory z praxe AI-asistovaného vývoje — k volnému použití, ú
 
 | Balíček | Co dělá |
 |---------|---------|
-| [vibecoding-production-guard](vibecoding-production-guard/) | Produkční gate pro AI-asistované změny: analytický gate před změnou, tři defektní optiky, binární stop-ship checklist před nasazením a přehled chyb detekce (jak selhává audit samotný). |
+| [vibecoding-production-guard](vibecoding-production-guard/) | Produkční gate pro AI-asistované změny: analytický gate před změnou, čtyři defektní optiky (včetně tichého selhání), binární stop-ship checklist před nasazením, přehled chyb detekce (jak selhává audit samotný) a tvar výstupu auditu. |
 
 Instalace a podrobnosti: README uvnitř každého balíčku.
 

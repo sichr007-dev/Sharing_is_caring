@@ -1,0 +1,4 @@
+# Interní podklady (auditní reporty, pracovní dokumenty) nepatří do veřejného repa
+*.docx
+*.xlsx
+*.pptx
