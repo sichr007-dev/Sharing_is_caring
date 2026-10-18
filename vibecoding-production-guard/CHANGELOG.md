@@ -3,6 +3,44 @@
 Formát: verze, datum, co se změnilo a **proč** (odkud přírůstek vznikl). Skill je produkt,
 ne dokumentace: po každém auditním běhu se kontroluje delta. Prázdná delta je signál.
 
+## 1.3.0 — 2026-10-18
+
+Veřejná aktualizace navazuje na zdejší verzi 1.1. Spojuje zpřesnění práce s důkazy
+a nové posouzení výkonu a škálovatelnosti.
+
+**Výkon a škálovatelnost**
+
+- Samostatné kontroly I1–I6: provozní profil, celý uživatelský tok, věrohodnost zátěže,
+  růst a zotavení, správnost výsledků a samostatný výkonový verdikt.
+- Rozlišení otevřeného, uzavřeného a smíšeného modelu; plánovaná, odstartovaná
+  a dokončená práce, chyby a neodstartované iterace, limity generátoru.
+- Datový objem, rozložení, souběh, cache, špička a delší běh podle rizika.
+  Úplnost výsledku a skutečné dokončení mají přednost před samotným HTTP 200.
+- Srovnatelné podmínky, počty vzorků a běhů, nejistota rozdílu a limity extrapolace.
+  Přihlášení se měří, pokud je cílem nebo součástí hodnoceného provozního mixu.
+- Registr 23 výkonových podkladů: výzkum, odborné metodiky, oficiální dokumentace,
+  GitHub nástroje a komunitní diskuse; u každého použití a omezení.
+- Volba nástroje podle otázky. Žádný povinný cloud, univerzální práh ani instalace
+  celého monitorovacího stacku.
+
+**Důkazy a rozhodování**
+
+- Režimy změna / vydání / audit; přiměřená hloubka podle dopadu.
+- PASS / FAIL / UNKNOWN / N/A a oddělené přijetí rizika; verdikt pro konkrétní fázi.
+- Negativní test musí dosáhnout testované ochrany. Oprava se podle dostupnosti
+  porovnává s výchozím chováním a zachovává legitimní operace.
+- Rozlišení přístupových modelů, veřejných a tajných klíčů, kontextu CSRF/RLS,
+  skutečného obsahu artefaktu a kompatibilních mezistavů nasazení.
+- Aktualizovaná bibliografie s verzemi, omezeními a vazbou na konkrétní pravidla.
+  Nepodložené univerzální statistiky ani jednotlivé výsledky studií se nevydávají
+  za účinnost tohoto skillu.
+
+**Veřejná distribuce**
+
+Zachována licence a historie předchozích veřejných verzí. Příklady jsou zobecněné;
+balíček obsahuje metodu a veřejné zdroje, bez interních reportů, provozních údajů,
+identifikátorů projektů nebo jejich rozhodovací historie.
+
 ## 1.1 — 2026-09-13
 
 Přírůstek z jednoho kompletního auditního běhu nad produkční SPA + BaaS aplikací (čtyři vlny:

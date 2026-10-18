@@ -1,75 +1,81 @@
 # Vibecoding Production Guard
 
-Skill pro Claude Code (a kompatibilní AI coding agenty): **produkční gate pro AI-asistované
-změny** v aplikacích, které mají produkční ambici. Destilovaný z praxe hardeningu a auditů
-AI-asistovaně vyvíjených aplikací a ukotvený ve výzkumu bezpečnosti vibe-coded aplikací.
+Skill pro Claude Code a kompatibilní AI coding agenty: produkční gate pro
+AI-asistované změny, připravenost vydání a vymezený audit projektu.
 
-Aktuální verze: **1.1** (2026-09-13). Historie změn: [CHANGELOG.md](CHANGELOG.md).
+Aktuální verze: **1.3.0** (2026-10-18). Historie změn: [CHANGELOG.md](CHANGELOG.md).
 
-## Proč
+## Co ověřuje
 
-Aplikace, které „fungují", nejsou totéž jako aplikace konzistentní, zabezpečené a obnovitelné.
-Z 200 auditovaných nasazených vibe-coded aplikací jich 91 % obsahovalo aspoň jednu zranitelnost
-a 65,77 % nálezů bylo Critical/High (Deng, Fan, Meng: *Understanding the (In)Security of
-Vibe-Coded Applications*, [arXiv:2606.23130](https://arxiv.org/abs/2606.23130), v3 09/2026).
-Většina těch chyb nevzniká neznalostí zranitelností, ale opakovanými **mechanismy**
-AI-asistované práce: neúplným šířením změny, fixem přes oslabení obranné vrstvy, nevysloveným
-invariantem — a tichým selháním, kdy se chyba převede na prázdnou obrazovku bez signálu.
-Tenhle skill je proces, který ty mechanismy chytá dřív, než dojedou do produkce.
+Pomáhá prověřit systémové kontrakty, oprávnění, integritu dat, chování při selhání,
+výkon a provozní obnovu. Výsledek se vztahuje ke konkrétní revizi, prostředí a fázi
+vydání. Funkční průchod sám nedokládá bezpečnost, použitelnou odezvu ani kapacitu.
+
+Každá relevantní kontrola má **PASS / FAIL / UNKNOWN / N/A**, důkaz a rozsah.
+Přijaté riziko se eviduje samostatně. Celkový verdikt je **READY**,
+**READY WITH ACCEPTED RISKS** nebo **BLOCKED** pro pojmenovanou fázi.
+Skill není certifikace projektu ani úplný audit podle bezpečnostního standardu.
 
 ## Co je uvnitř
 
 | Soubor | Obsah |
 |---|---|
-| `SKILL.md` | tenký gate: kdy se zastavit, 4 kroky, tvar výstupu auditu, co je mimo scope |
-| `references/defect-classes.md` | čtyři defektní třídy s ilustrativními scénáři a loveckými heuristikami |
-| `references/analytical-gate.md` | 10bodový gate před změnou + self-review checklist diffu |
-| `references/stop-ship-checklist.md` | binární checklist před nasazením (🔴/🟡) s důkazní povinností |
-| `references/verification-failure-modes.md` | sedm tříd chyb detekce — jak selhává audit samotný — a důkazní žebřík |
-| `references/audit-output.md` | tvar výstupu auditu: třídění, stavy, jedna ID řada, hranice mandátu |
-| `references/sources.md` | anotovaná bibliografie: co skill tvrdí a o co se to opírá |
+| [SKILL.md](SKILL.md) | režim kontroly, čtyři defektní optiky, review a gate vydání |
+| [Analytický gate](references/analytical-gate.md) | příčina, kontrakt, celý tok, souběh, dodání a výkonový dopad |
+| [Defektní optiky](references/defect-classes.md) | neúplná propagace, oslabení obrany, nevyslovený invariant a tiché selhání |
+| [Stop-ship checklist](references/stop-ship-checklist.md) | kontroly A–I s důkazy, relevancí a pravidly pro neověřený stav |
+| [Chyby detekce](references/verification-failure-modes.md) | dosažitelnost nálezu, negativní test, legitimní data a platnost důkazů |
+| [Výstup auditu](references/audit-output.md) | rozsah, záznamy, nálezy, fáze a hranice mandátu |
+| [Výkon a škálovatelnost](references/performance-scalability.md) | profil práce, celý uživatelský tok, platnost zátěže, růst, správnost a zotavení |
+| [Zdroje](references/sources.md) | bezpečnost, metodiky a jejich omezení |
+| [Výkonové zdroje](references/performance-sources.md) | výzkum, oficiální dokumentace, otevřené nástroje a komunitní podněty |
 
-Reference o chybách detekce je nejméně obvyklá část: neřeší chyby v kódu, ale chyby v jejich
-*hledání* — falešné PASS, plauzibilní nereprodukovatelné nálezy, testování přítomnosti
-obrany místo jejího chování, slepé skvrny měřicího nástroje. Vychází z praxe multi-agentních
-auditů s adversariální verifikací nálezů.
+## Výkon jako samostatná část auditu
 
-## Instalace
+Při auditu projektu nebo vydání se hodnotí šest oblastí I1–I6:
 
-Zkopíruj adresář do skills lokace svého agenta:
+1. Úlohy, akceptační kritéria, data, očekávaná práce a prostředí.
+2. Čas do použitelného výsledku napříč klientem, sítí, backendem a databází.
+3. Vhodný model zátěže, plánovaná a dokončená práce i limity generátoru.
+4. Růst dat a provozu, špičky, delší běh a zotavení podle rizika.
+5. Správnost a úplnost výsledků, chyby, variabilita a reprodukovatelnost.
+6. Samostatný verdikt s vymezením ověřené kapacity a neověřených oblastí.
+
+U lokální změny se hloubka volí podle dopadu. Chybějící měření zůstane UNKNOWN.
+Kritéria se odvozují z potřeb projektu; ukázkové latence, počty uživatelů nebo velikost
+dat nejsou univerzální limity. Nástroje jako k6, Locust, sitespeed.io, Lighthouse CI
+nebo wrk2 se vybírají podle měřené otázky a dostupného prostředí.
+
+## Instalace a použití
+
+Zkopíruj celý adresář do skills lokace svého agenta:
 
 ```bash
-# Claude Code — globálně (všechny projekty)
+# Claude Code — globálně
 cp -R vibecoding-production-guard ~/.claude/skills/
 
-# nebo per-projekt
+# nebo pro jeden projekt
 cp -R vibecoding-production-guard <projekt>/.claude/skills/
 ```
 
-Skill se aktivuje automaticky, když se změna dotkne gate povrchů (auth, schéma, stavy,
-vstupy, secrets, nasazení, chování při selhání), nebo když zadání zní jako oprava symptomu
-(„oprav login", „vrací to jen 1000 řádků").
+Při aktualizaci zachovej zálohu a přenes konzistentní sadu souborů.
+Automatický výběr závisí na agentním prostředí. Explicitní zadání může znít:
 
-## Scope
+„Použij vibecoding-production-guard na tuto změnu / kandidáta vydání / vymezený audit.“
 
-Příklady předpokládají dnes nejběžnější vibecoding stack: klientská SPA + managed
-Postgres/BaaS (Supabase-style). Principy platí obecně — názvy si přelož na svůj stack.
-Scénáře v referencích jsou ilustrativní: destilované vzory, ne případové studie
-konkrétního systému. Prahové hodnoty (strop řádků, délka URL) jsou vlastnosti konkrétní
-infrastruktury; přenáší se metoda, kterou se hrana najde, ne číslo.
+Skill zohledňuje místní pravidla, dostupné nástroje a již udělená oprávnění.
+Aktivace skillu sama nepovoluje nasazení, zátěž produkce nebo odesílání dat do cloudu.
 
-## Poděkování a zdroje
+## Přenos mezi projekty a anonymizace
 
-Úplný seznam s anotacemi: [references/sources.md](references/sources.md). Klíčové opory:
+Scénáře jsou zobecněné ilustrace mechanismů chyb. Balíček neobsahuje interní auditní
+reporty, projektové identifikátory, provozní data ani mapování nálezů na konkrétní systém.
+Příklady často používají SPA a Postgres/BaaS; použitelnost posuď podle skutečného stacku.
+Názvy větví, schvalovací postupy, architekturu ani číselné limity nepřenášej automaticky.
 
-- Deng, Fan, Meng: *Understanding the (In)Security of Vibe-Coded Applications*,
-  arXiv:2606.23130 (2026) — rámování defektních tříd 1–3
-- Yuan et al.: *Simple Testing Can Prevent Most Critical Failures*, USENIX OSDI 2014 —
-  empirický základ třídy 4 (tiché selhání)
-- OWASP Top 10:2025, kategorie A10 *Mishandling of Exceptional Conditions* a A03 *Software
-  Supply Chain Failures*
-- [benavlabs/vibe-check](https://github.com/benavlabs/vibe-check) — inspirace pro vrstvu
-  manuálních kontrol člověkem (sekce G stop-ship checklistu)
+Čtyři optiky jsou pracovní model, nikoli úplná taxonomie nebo populační statistika.
+Každý výzkumný zdroj má uvedené použití a omezení. Komunitní diskuse a cizí skilly
+slouží jako podněty; technická pravidla mají oporu v primárních zdrojích.
 
 ## Licence
 

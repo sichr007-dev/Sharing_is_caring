@@ -1,82 +1,66 @@
-# Analytický gate a self-review — plné znění
+# Analytický gate a review diffu
 
-Dva šablonové průchody: **před změnou** (gate) a **po implementaci** (self-review diffu).
-Smysl: nahradit impulzivní „prompt patching" (symptom → úprava → obrazovka funguje → dál)
-analýzou, která drží systémový kontext. Nejde o délku — u malé změny je průchod otázka
-dvou minut; u změny na gate povrchu (auth/policies/migrace/stavy/chybové cesty) je to jediná
-pojistka proti čtyřem defektním třídám.
+Použij před změnou na gate povrchu a při jejím ověření. Délku zápisu přizpůsob riziku;
+stručný zápis nesmí přeskočit důvěryhodnostní hranici.
 
-## Gate před změnou (zatím neměň kód)
+## Před změnou
 
-1. **Skutečná příčina** — popiš příčinu, ne symptom. Ověř ji důkazem (log, dotaz, repro),
-   ne dojmem. Zvlášť u „RLS/validace/auth blokuje X": nejdřív rozhodni, jestli blokuje
-   *správně*. Zvlášť u „vrací to jen N řádků" / „filtr někdy nic nevrátí": nejdřív zjisti,
-   jestli nejde o strop API nebo limit brány (defect-classes.md §4).
-2. **Celý tok** — zmapuj cestu: klientská komponenta → hook/query vrstva → API dotaz nebo
-   RPC → brána/proxy → policy/grant → úložiště. Vyjmenuj všechny dotčené soubory, endpointy,
-   tabulky, policies, RPC, secrets, externí služby.
-3. **Spec-first** — přečti relevantní projektový spec, příslušné ADR a dokument invariantů
-   (existují-li). Nerekonstruuj pravidla z paměti.
-4. **Invarianty** — vyjmenuj, které systémové a bezpečnostní invarianty se změny týkají
-   a jak zůstanou zachovány. Nenapsaný invariant, na který ses právě spolehl → zapiš jako
-   kandidáta do dokumentu invariantů.
-5. **Kontrola oslabení** — zkontroluj explicitně: neoslabuje návrh autentizaci, autorizaci,
-   RLS/policies, granty, validaci, CORS, TLS, transakčnost, auditování nebo limity payloadu?
-   Pokud ano, je to rozhodnutí pro ownera, ne implementační detail.
-6. **Blast radius a propagace** — která další místa implementují stejné pravidlo
-   (whitelisty, grants, UI guard + serverový guard, duplikované konstanty, kopie funkce per
-   entita)? Změna jde do všech, nebo má zapsaný důvod, proč ne. Zvaž mechanickou pojistku
-   (smoke assert, constraint), aby si příští změna „nemusela vzpomenout".
-7. **Souběh a regrese** — co se stane při dvojkliku, retry, dvou uživatelích nad stejným
-   záznamem (ztracený zápis: má UPDATE podmínku na verzi?), starém klientu proti nové DB
-   (oddělené nasazení DB a klienta!)?
-8. **Chování při selhání** — pro každou novou nebo změněnou čtecí i zapisovací cestu: co
-   uvidí uživatel, když dotaz selže, vrátí jen část (strop řádků), nebo ho brána odmítne
-   (délka URL, velikost těla)? Prázdný výsledek musí být odlišitelný od chyby; částečný
-   výsledek musí být detekovatelný (count vs. doručeno, explicitní stránkování).
-9. **Testy předem** — navrhni test/smoke, který před opravou selže a po ní projde.
-   U DB změny: migrace + rollback-tx smoke blok do repa. U chybové cesty: negativní test,
-   který poruchu skutečně vyvolá (ne jen ověří, že handler existuje).
-10. **Minimální změna** — teprve teď navrhni diff. Žádné nesouvisející refaktory; ty jdou
-    do samostatného commitu, pokud vůbec. Pokud jednořádková oprava vymění jednu vadu za
-    jinou (např. „nevidím obsah" za „nedostanu se jinam"), rozsah opravy je rozhodnutí
-    ownera — předlož obě varianty s cenou, nenasazuj tu levnější mlčky.
+1. **Mandát a kotva:** oprava, audit, nebo vydání? Jaká revize a prostředí?
+   Co je povolené měnit a kam smí odcházet data?
+2. **Příčina:** dolož symptom a jeho mechanismus logem, dotazem nebo reprodukcí.
+   Odmítnutí RLS/validací může být správné chování. Do určení příčiny nezmírňuj ochranu.
+3. **Kontrakt:** přečti místní specy, ADR, invarianty a schválené výjimky.
+   Rozpor bez určitelného zdroje pravdy eskaluj podle projektu.
+4. **Tok a hranice:** klient → API/RPC → grant/policy → data → externí služba.
+   Urči, kdo ovládá vstup, kdo nese identitu a kde se vynucuje oprávnění.
+5. **Invarianty a kopie:** které vlastnosti se nesmějí změnit a kde všude jsou implementované?
+   Zahrň whitelisty, typy, kopie zápisových cest, piny, manifesty a evidenci testů.
+6. **Oslabení:** nevyřeší návrh problém přidáním privilegovaného účtu, odstraněním validace,
+   vypnutím TLS, rozšířením grantů nebo obejitím schvalovacího kroku?
+   CORS není autorizace; jeho chování posuzuj podle typu dat a autentizace.
+7. **Selhání a limity:** timeout, 403, částečná odpověď, chybějící pole, výpadek služby,
+   překročená velikost, rozpad stránky dat. Co uvidí uživatel a co provoz?
+   Prázdno, chyba, neúplná a zastaralá data mají mít rozlišitelnou sémantiku.
+8. **Souběh:** dvojklik, retry po timeoutu s neznámým výsledkem, souběžný zápis,
+   duplicitní či přeházený webhook. Urči atomické hranice a trvalou deduplikaci tam,
+   kde by opakování poškodilo data nebo provedlo placenou akci znovu.
+9. **Dodání a obnova:** starý klient / nová DB, cache a dlouho otevřený tab,
+   nová aplikace / staré API, rollback se změněnými daty.
+   DB-first je bezpečné jen s kompatibilní přípravnou změnou; destruktivní odstranění
+   přichází až po odchodu starých konzumentů. Nevnucuj jeden delivery model všem projektům.
+10. **Ověření a diff:** navrhni důkaz chování, legitimní kontrolní případ a negativní test
+    pod skutečnou rolí. U chyby preferuj porovnání baseline/oprava.
+    Implementuj minimální soudržnou změnu; nesouvisející refaktory odděl.
 
-Krátká cesta: u změny, která se gate povrchů dotýká jen okrajově, stačí body 1, 2, 6, 8 —
-ale rozhodnutí „jdu krátkou cestou" napiš nahlas do odpovědi, ať je auditovatelné.
+11. **Výkonový dopad:** změní se počet requestů, objem/rozložení dat, souběh,
+    cache, render, fronta nebo resource limity? U auditu projektu/vydání vždy použij
+    [I1–I6](performance-scalability.md); u změny dotčené kontroly. Chybějící výkonový
+    požadavek nebrání objevení a změření provozního problému.
 
-## Self-review diffu (po implementaci, před commitem)
+U datového symptomu ověř původ dat a dnešní zapisovatel. Historická data mohou být legitimní
+produkční data, která musí změna podporovat; nerozhoduj o jejich zahození podle stáří.
 
-Projdi vlastní diff jako nezávislý reviewer. Nevylepšuj kód — nejdřív jen sepiš nálezy
-(soubor, závažnost, důkaz):
+## Review po implementaci
 
-- porušení invariantů z bodu 4 gate
-- chybějící serverová autorizace (nové/změněné dotazy a RPC — kdo smí, v jakém stavu,
-  nad čím)
-- neošetřené vstupy: skládání SQL/HTML/URL, chybějící runtime validace, `...body` spready
-- únik secrets: nové env proměnné (build-time prefixy typu `VITE_*`/`NEXT_PUBLIC_*`!),
-  klíče v kódu, tokeny v logu, source mapy a interní soubory v publikovaném artefaktu
-- chybějící transakce u vícekrokových zápisů; přímé UPDATE stavů mimo transition operace
-- race conditions a duplicitní mutace (double-click, retry); editace záznamu bez ochrany
-  proti ztracenému zápisu
-- **neúplné šíření změny**: grep na název pole/pravidla — dorazila změna do whitelistů,
-  grantů, smoke assertů, typů, všech kopií funkce?
-- **tiché selhání**: nové čtecí cesty bez chybového stavu odlišitelného od prázdna; dotazy
-  bez explicitního `range`/`limit`/`single` nad tabulkou, která poroste; filtry ze seznamu
-  ID přes GET; `?? []` a prázdné `catch` u nového kódu
-- odstraněné/změkčené obranné řádky (mazání kolem auth/validace je podezřelejší než
-  přidávání); nové `@ts-ignore`, `eslint-disable`, prázdné `catch`, vypnuté kontroly,
-  zvednuté limity
-- regresní dopad na jiné komponenty/endpointy sdílející tok
-- chybějící error handling a auditní stopa
+- Přístup: nová cesta nemůže obejít serverovou autorizaci přes jiné ID, tenant, roli,
+  hromadný endpoint, view, export, storage objekt nebo privilegované RPC.
+- Vstupy: runtime validace na hranici, explicitně povolená měnitelná pole,
+  parametrizované dotazy a kontextově správné zacházení s HTML, URL a cestami.
+- Integrita: transakce, constrainty a stavové přechody chrání invariant i bez UI.
+  Síťový timeout neznamená, že zápis neproběhl; retry nesmí nechtěně zdvojit efekt.
+- Selhání: žádný catch převádějící neúspěch na úspěch, nepozorovaný ořez,
+  optimistické UI bez obnovy stavu nebo nekonečný retry.
+- Secrets a artefakt: zkontroluj skutečný výstup buildu a veřejné endpointy.
+  Rozlišuj veřejné identifikátory od klíčů s privilegii.
+- Supply chain: změny lockfilu, instalačních skriptů, CI oprávnění a agentních konfigurací
+  mají vysvětlení. Lockfile zamyká i škodlivou verzi; není důkazem důvěryhodnosti.
+- Propagace: prověř další implementace stejného pravidla a vedlejší evidence
+  (testovací konfigurace, manifest vydání, přehled provedených kontrol).
+- Důkaz opravy: test opravuje chování, není pouze upraven tak, aby přestal hlásit chybu.
+  Zaznamenej použitý commit/diff, role, data, příkazy a výsledek bez citlivých hodnot.
 
-Nálezy vyřeš, nebo je explicitně předlož ownerovi jako známé riziko. Mlčky přejít nález
-= defekt třídy 2 (oslabení obrany), jen v měkčí podobě.
+## Rozsah a rozhodnutí
 
-## Vztah k projektové disciplíně
-
-Gate nenahrazuje, jen zapíná ve správný moment to, co v projektu už platí: spec-first,
-schvalovací kroky na DDL/nasazení, migrace + smoke bloky v repu, decision log či commit
-trailery (má-li je projekt), ADR pro load-bearing rozhodnutí. Pokud gate odhalí, že se rozhoduje
-něco strukturálního (oslabení vrstvy, nový kanonický kontrakt), výstupem je ADR návrh,
-ne tichý fix.
+Výstup analýzy má umožnit rozhodnutí: příčina → ohrožené pravidlo → změna → důkaz.
+Nové doménové rozhodnutí předej místnímu spec/ADR procesu. Audit sám neuděluje mandát
+k nové funkci, refaktoringu, deployi nebo změně trust modelu.

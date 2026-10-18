@@ -1,150 +1,165 @@
-# Stop-ship checklist — binární, s důkazní povinností
+# Gate vydání — kontroly a důkazy
 
-Každá položka se zodpovídá **ano/ne + důkaz** (soubor:řádek, výstup dotazu, log, screenshot).
-„Myslím, že ano" = ne. Položky označené 🔴 blokují nasazení vždy; 🟡 blokují, pokud pro ně
-neexistuje zapsané vědomé rozhodnutí (ADR nebo dokument invariantů).
+Pro konkrétní revizi, artefakt, prostředí a fázi vyber relevantní kontroly.
+Každá má ID, výsledek PASS / FAIL / UNKNOWN / N/A, důkaz, roli a datum.
+N/A zdůvodni; chybějící přístup, nespustitelný test nebo nedostupný skener znamená UNKNOWN.
 
-Formulováno pro typický stack „klientská SPA + managed Postgres/BaaS" (React + Supabase apod.),
-principy platí obecně — přelož si názvy na svůj stack.
+**🔴** Relevantní FAIL nebo UNKNOWN blokuje příslušnou fázi.
+**🟡** Nesplnění vyžaduje opravu nebo existující přijatelné rozhodnutí podle pravidel projektu.
+Neověřenou 🟡 kontrolu uveď výslovně; neuzavřené riziko bez rozhodnutí blokuje.
+Výjimka nese vlastníka, rozsah, důvod, platnost nebo podmínku přezkumu a odkaz.
+Neznámé riziko lze přijmout jen výslovně jako neověřené, pokud to místní kontrakt dovoluje;
+nesmí se změnit na PASS. Schválené projektové výjimky znovu neotvírej bez doložené změny předpokladů.
 
-## A. Secrets, klíče a artefakt
+## A. Secrets a publikovaný obsah
 
-- 🔴 Žádný service/secret klíč v klientském kódu, repu ani logu.
-  Důkaz: grep bundlu/`src/` na klíčové prefixy; kontrola build-time env proměnných
-  (vše s prefixem typu `VITE_*`/`NEXT_PUBLIC_*` končí v bundlu — smí tam být jen
-  anon/publishable klíče a veřejné URL).
-- 🔴 Žádné hardcodované credentials, tokeny, hesla v kódu ani migracích.
-  Pozn.: credential lifecycle (generování + založení účtu + zápis) nepatří do jednoho
-  shell skriptu — AV heuristiky to flagují jako malware a na Windows soubor rovnou smažou.
-- 🟡 Publikovaný artefakt (bundle, balíček, image) neobsahuje source mapy, `.env`, interní
-  dokumentaci ani testovací fixtury. Důkaz: výpis obsahu artefaktu, ne packaging konfigurace
-  — únik zdrojáků přes špatně nakonfigurované balení je doložená třída incidentu, kterou
-  logický review nevidí (viz sources.md §F).
+- **A1 🔴** Žádný privilegovaný klíč, heslo nebo osobní/citlivý dump v publikovaném
+  artefaktu, dostupném endpointu, zdrojovém repu či jeho historii nebo veřejném logu.
+  Důkaz: kontrola změny, buildu a relevantní historie; citlivé hodnoty nezapisuj do reportu.
+  Aktivní únik vyžaduje zastavit příslušné vydání a eskalovat revokaci/rotaci podle oprávnění.
+- **A2 🔴** Rozlišené veřejné identifikátory a secrets; env proměnné v klientu posouzené
+  podle skutečné konfigurace bundleru. Supabase publishable / legacy anon klíč je veřejný;
+  secret / service_role je privilegovaný. Veřejný klíč není důkazem správné autorizace.
+- **A3 🟡** Zkontrolovaný obsah skutečně distribuovaného balíčku/buildu:
+  žádné neplánované .env, .git, zálohy, testovací data nebo interní konfigurace.
+  Source mapa je nález podle svého obsahu a zamýšlené expozice; sama její existence
+  není únik tajemství. Confidential zdrojáky/secrets v mapě posuzuj podle A1.
 
-## B. Přístup (autentizace ≠ autorizace)
+## B. Identita a autorizace
 
-- 🔴 Každá tabulka s daty má RLS zapnutou a policy, která skutečně filtruje.
-  Důkaz: dotaz na `pg_policies` + `pg_tables.rowsecurity`; každá `using (true)` policy má
-  zapsané rozhodnutí, proč je OK. Pozor: permisivní policies se skládají přes OR — jedna
-  široká policy tiše přebije všechny úzké (defect-classes.md §4 „pravidlo existuje a neplatí").
-- 🔴 Autorizace se vynucuje v DB/na serveru, ne skrytím prvků v klientu (viditelnost
-  v navigaci je UX, ne ochrana).
-- 🔴 Uživatel nemůže změnou ID v requestu číst/měnit cizí záznam (IDOR/BOLA test).
-- 🟡 Grants odpovídají hardening režimu DB: nová tabulka má explicitní GRANT +
-  privilege assert ve smoke (klasika třídy „neúplné šíření změny", viz defect-classes.md §1).
-- 🟡 Sensitive RPC nejsou volatelné s anon klíčem; SECURITY DEFINER funkce mají prověřený
-  `search_path` a oprávnění — a guardy uvnitř nich pamatují, že `current_user` je vlastník,
-  ne volající (viz verification-failure-modes.md §3).
+- **B1 🔴** Přístupová matice identita × operace × objekt/tenant odpovídá schválenému
+  modelu a je vynucená na serveru/DB. Změna ID, role či pole requestu ji neobejde.
+  Důkaz zahrnuje povolený i zakázaný případ pod reálnou identitou.
+- **B2 🔴** Anonymní a privilegované vstupní body odpovídají záměru.
+  Prověř API/RPC, exporty, storage, views a alternativní cesty ke stejným datům.
+  V DB vystavené přímo klientu ověř grants + RLS/policies na exponovaných tabulkách;
+  nevyžaduj RLS pro každý backend každého stacku.
+- **B3 🟡** Nové tabulky mají zamýšlené explicitní granty a privilege asserty.
+  Prověř default privileges, function EXECUTE, SECURITY DEFINER/search_path a vlastníka.
+  U views ověř efektivní identitu; RLS základní tabulky automaticky nedokazuje ochranu view.
+  Přesná syntaxe/omezení závisí na verzi a místních schválených výjimkách.
+- **B4 🔴**, když se mění auth: ověř podpis a povinné claims tokenu podle použitého
+  protokolu, expiraci a chování odhlášení/revokace podle kontraktu; hesla přes udržovaný
+  auth systém, reset/pozvánky bez bypassu a neomezeného opakovaného použití.
+  Nepředpokládej, že expirovaný refresh token ihned zneplatní každý již vydaný access token.
+- **B5 🟡** Session cookies a CSRF ochrana odpovídají mechanismu autentizace.
+  U browserem automaticky přikládaných credentials ověř cross-site mutaci.
+  CORS nepovažuj za autorizaci ani sám o sobě za CSRF ochranu.
+  Wildcard na veřejném assetu není automaticky chyba; cookie požadavky nevynucuj
+  na aplikaci bez cookie session.
 
-## C. Integrita dat a souběh
+## C. Integrita, souběh a externí efekty
 
-- 🔴 Business invarianty vynucuje DB (NOT NULL, UNIQUE, FK, CHECK), ne jen formulář.
-- 🔴 Vícekrokové business operace jsou transakční; stavové přechody jdou přes atomické
-  serverové operace, žádný přímý UPDATE stavu z klienta.
-- 🟡 Kritické mutace přežijí double-click/retry (idempotence: unikátní constraint,
-  idempotency key, nebo doložené proč to nevadí).
-- 🟡 Workflow pořadí vynucuje server — klient nemůže zavolat „finalize" bez předchozích stavů.
-- 🟡 Editace záznamu z UI chrání proti ztracenému zápisu: UPDATE má podmínku na verzi nebo
-  `updated_at` (compare-and-set) a nulový počet změněných řádků se hlásí jako konflikt —
-  nebo je zapsané rozhodnutí, že last-write-wins je pro tuto entitu přijatelné. Důkaz:
-  test dvou sezení (defect-classes.md §4), ne přítomnost sloupce `version`.
+- **C1 🔴** Business invarianty přežijí přímé volání API bez UI; constrainty a serverové
+  operace chrání stavové přechody, povolená pole a vícekrokové zápisy.
+- **C2 🟡** Dvojklik, retry po neznámém výsledku a dva zapisovatelé nevedou k nechtěné
+  duplicitě či ztracenému zápisu. Důkaz: souběžný test, constraint, CAS nebo jiný
+  doložený mechanismus; žádná povinná univerzální strategie.
+- **C3 🔴**, jsou-li webhooky/placené nebo nevratné efekty: ověření původu/podpisu podle
+  poskytovatele, replay/freshness pravidel a trvalá idempotence.
+  U podpisů závislých na raw payload ověř přesné přijaté bytes.
+  Duplicita a změna pořadí událostí nesmějí zdvojit efekt nebo vrátit stav zpět.
+  Síťovou službu nelze automaticky zahrnout do DB transakce; ověř retry/outbox/kompenzaci
+  podle kontraktu, ne pouze existenci BEGIN/COMMIT.
 
-## D. Vstupy, výstupy a chování při selhání
+## D. Vstupy, selhání a limity
 
-- 🔴 Žádné skládání SQL/HTML/URL/path z uživatelského vstupu bez parametrizace/sanitizace;
-  `dangerouslySetInnerHTML` (a ekvivalenty) jen se sanitizovaným obsahem.
-- 🔴 Runtime validace vstupů na hranici (statické typy za běhu neexistují; žádné slepé
-  `update({ ...body })`).
-- 🔴 Každá čtecí cesta má chybový stav odlišitelný od prázdného výsledku. Důkaz: vyvolaná
-  porucha (chyba serveru, přerušené spojení, timeout) nad plochou a screenshot toho, co
-  uživatel vidí — ne přítomnost `error` větve v kódu.
-- 🟡 Dotazy nad tabulkami, které porostou, mají explicitní stránkování (`range`/`limit`)
-  nebo kontrolu „count v DB = počet doručený"; strop API (`db-max-rows`) je znám a zapsán.
-  Souhrny, exporty a KPI se nikdy nepočítají z odpovědi, která mohla být ořezaná.
-- 🟡 Filtry skládané ze seznamu ID nebo z výběru uživatele mají hranici velikosti, jdou
-  přes POST/RPC, nebo je doložená maximální délka požadavku pod limitem brány. Odmítnutí
-  bránou (413/414) nemá CORS hlavičky a v aplikaci vypadá jako „nic".
-- 🟡 Produkční chybové stavy neprozrazují interní detaily (stack trace, SQL chyby) uživateli.
-- 🟡 Vstupy přijímající URL nebo soubory (import, webhook, upload, náhled externí stránky)
-  mají omezení: typ/velikost souboru, allowlist cílů, žádný přístup do interní sítě (SSRF).
-- 🟡 Neautentizované vstupní body (feed tokeny, webhooky) mají rate limiting nebo aspoň
-  doložené rozhodnutí, proč ho nepotřebují; tokeny jsou revokovatelné.
-- 🟡 Bezpečnostní HTTP hlavičky (CSP, X-Frame-Options…) nastavené, nebo zapsané rozhodnutí,
-  že u interní aplikace za loginem zatím ne.
-- 🟡 Pokud aplikace volá LLM s uživatelským vstupem nebo mu dává nástroje: vstup i načtený
-  obsah (dokumenty, e-maily, webové stránky) se považují za nedůvěryhodné instrukce, nástroje
-  mají allowlist a oprávnění *volajícího uživatele* (ne service účtu), výstup modelu se
-  nespouští ani nevkládá do HTML bez sanitizace (OWASP Agentic ASI01–ASI03, viz sources.md §G).
+- **D1 🔴** Runtime validace na hranicích, explicitní povolená pole,
+  parametrizace SQL a kontextově správné kódování/sanitizace výstupu.
+  Typy ani UI validace nechrání samostatné API.
+- **D2 🔴**, jsou-li příslušné vstupy: URL fetch, upload, archivy a cesty
+  neumožní SSRF, path traversal, nepovolené schéma, přístup k metadatům ani únik dat.
+  Ověř limity velikosti/dekomprese a relevantní redirect/DNS chování.
+- **D3 🔴** Selhání důležité čtecí či zápisové cesty je rozlišitelné od prázdna/úspěchu.
+  Výpadek nezpůsobí fail-open, částečný zápis bez signalizace nebo nekonečný retry.
+  Podrobnosti pro diagnostiku se logují bezpečně, uživatel nedostává secrets/stack trace.
+- **D4 🟡** Stránkování, exporty a agregace zachovávají úplnost podle kontraktu.
+  Otestuj překročení reálného stropu řádků a velikosti filtru/URL.
+  Ořez ani odhad počtu nejsou úplný report; nepotřebné exact count nevynucuj všude.
+- **D5 🟡** Zneužitelné či nákladné operace mají přiměřené limity:
+  velikost dávky, čas, počet pokusů, fan-out, frontu, spotřebu externího API a náklady.
+  Zvlášť login/reset, veřejné tokeny a automatizovatelné obchodní operace.
+  Zátěžové a fault testy prováděj izolovaně, ne proti živým uživatelům.
 
-## E. Migrace a nasazení (oddělené nasazení DB a klienta)
+## E. Migrace a dodání
 
-- 🔴 DB změna aplikována PŘED nasazením klienta; nová serverová volání (RPC/endpointy)
-  ověřena v cílovém prostředí přímým dotazem (`pg_proc`, health check) — ne přes evidenci
-  migrací, ta může lhát.
-- 🔴 `git log origin/main..HEAD` zkontrolován před pushem — push bere celou větev včetně
-  cizích lokálních commitů; commit čekající na „push až po DB apply" snadno odjede
-  s cizím pushem.
-- 🔴 Schéma se mění jen verzovanou migrací v repu + smoke blok; DDL/hromadné DML nad
-  sdíleným prostředím = schvalovaný krok, nikdy tichý zásah.
-- 🟡 Rollback známý: jak se změna vrací (migrace zpět / redeploy předchozí verze klienta)
-  a kdo to umí provést.
-- 🟡 Po reseedu/refreshi sdíleného prostředí proběhl smoke re-run (QA baseline je neplatná).
-- 🟡 Mechanické pojistky nasazení (piny počtu migrací, hash manifesty, count asserty)
-  bumpnuty vědomě a s doložením provenience — a po zavedení aspoň jednou skutečně spuštěny.
-- 🟡 Mezistav „nový klient proti staré DB" (nebo naopak) je buď nemožný, nebo otestovaný;
-  dvoukolejné nasazení už vyrábělo částečně nefunkční mezistavy.
+- **E1 🔴 — kandidát:** schéma má verzovanou migraci, test/smoke a aktualizované
+  mechanické pojistky. Ověř migrační řetězec a související testy v izolovaném prostředí
+  podle místního postupu.
+- **E2 🔴 — aktivace:** ověř delivery model, přesný commit a celý přenášený diff
+  proti skutečné cílové větvi; nehádej, že deployuje main.
+  Závislá DB/API schopnost musí existovat dříve, než ji začne používat klient.
+  Její existenci/kontrakt dolož přímo cílovým systémem, nikoli jen migrační historií.
+- **E3 🔴 — přechod:** starý klient, cache a dlouhé relace fungují během kompatibilní
+  přípravné změny; destruktivní krok má explicitní plán přechodu.
+  Záloha sama nedokazuje bezvýpadkovost ani bezztrátový rollback.
+- **E4 🟡** Známá cesta návratu/roll-forward, bod nevratnosti a vlastník.
+  U obnovy po nových zápisech popiš ztrátu dat nebo jejich slučování; neslibuj
+  „vrátíme build“ jako úplnou obnovu databáze.
+- **E5 🔴 — důkazní kontinuita:** důkazy se vztahují k dodávanému commitu/dirty diffu,
+  buildu, DB stavu, konfiguraci a datům. Změny zneplatňující kontrolu vyvolají její opakování.
+  Kandidátní PASS neznamená „nasazeno“; post-deploy ověření má samostatný záznam.
 
-## F. Provoz, obnova a auditovatelnost
+## F. Supply chain, CI a provoz
 
-- 🟡 Vlastnosti zálohy známé (co, jak často, retence) a obnova alespoň jednou vyzkoušená;
-  bez toho je „platforma dělá backup" jen domněnka. Chybí-li od vlastníka cíle obnovy
-  (přípustný výpadek, přípustná ztráta dat), vede se položka jako **blokovaná rozhodnutím**,
-  ne jako nesplněná.
-- 🟡 Kritické operace zanechávají auditní stopu (kdo, kdy, co); aplikační chyby jsou někde
-  vidět, ne jen v konzoli prohlížeče — včetně požadavků, které selžou **bez odpovědi**
-  (monitoring sledující jen kanál odpovědí je k nim slepý).
-- 🟡 Závislosti bez známých kritických zranitelností (lockfile + občasný audit; „funguje"
-  ≠ „může zůstat navždy"). Instalace v CI jde z lockfile (`npm ci`), nové verze mají
-  minimální stáří / cooldown, postinstall skripty jen se zdůvodněním — samošířící se npm
-  červi z roku 2026 cílí i na konfigurace AI agentů (hooks, tasks.json) a klíče v `~/.claude`,
-  `~/.codex` apod. (viz sources.md §F).
-- 🟡 Nové závislosti ověřené proti halucinaci/typosquattingu (balíček reálně existuje,
-  má historii a údržbu — AI občas navrhne neexistující nebo podvržený název).
-- 🟡 Projekt je auditovatelný: migrační sada přehratelná od nuly do prázdné DB, deterministický
-  generátor dat (nebo bezpečně anonymizovaný vzorek), klient přesměrovatelný na stínové
-  prostředí, ADR a dokument invariantů existují. Náklad je nulový, pokud se na to myslí při
-  vzniku migrací a seedu; při auditu je nesplatitelný — bez toho nelze spustit polovinu
-  prověrek, včetně těch s nejvyšší výtěžností (chování při selhání).
-- 🟡 Stínové/testovací prostředí není dosažitelné zvenčí. Kontrola po **každém** startu
-  prostředí, ne jednou — ochranná pravidla nepřežijí restart a kontejnerová vrstva umí obejít
-  host firewall (publikace portu na všechna rozhraní). Data bývají syntetická, vstupní bod
-  na server ne.
+- **F1 🟡** Reprodukovatelná instalace ze zkontrolovaného lockfilu, známé názvy/registry
+  a účel nových balíčků. Zkontroluj instalační skripty i změny agentních hooks/MCP/CI.
+  Samotné stáří nebo download count balíčku nedokazuje bezpečnost.
+- **F2 🟡** SCA/advisory kontrola odpovídá přesným verzím a prostředí.
+  Rozlišuj nález scanneru, dosažitelnost a dopad; neaktualizuj vše naslepo ani
+  nepoužívej force fix bez posouzení. Doložená kritická exploatovatelná cesta blokuje
+  podle dotčené 🔴 ochrany, i kdyby SCA report měl jiné souhrnné skóre.
+- **F3 🟡** Build/CI má minimální oprávnění a secrets nejsou dostupné nedůvěryhodným PR
+  nebo instalačním skriptům. Třetí strany jsou připnuté dle politiky projektu;
+  u GitHub Actions preferuj ověřený plný commit SHA. Omezení lifecycle skriptů nastav
+  podle skutečné verze package manageru; přepínač nenahrazuje izolaci.
+- **F4 🟡** Zkontrolovaná skutečná expozice TLS, cookies, bezpečnostních hlaviček,
+  storage a debug rozhraní v cílovém prostředí; localhost nedokazuje CDN/reverse proxy.
+  Zvol kontroly podle stacku a obsahu, nevynucuj plošně všechny hlavičky každému assetu.
+- **F5 🟡** Kritické chyby a operace mají bezpečnou auditní stopu a vlastníka reakce.
+  Známe rozsah/retenci záloh, poslední doloženou obnovu a přijatelné RPO/RTO
+  podle potřeb projektu; nevyzkoušená obnova se neoznačuje PASS.
+- **F6 🟡** Shadow/audit prostředí má omezenou síťovou expozici a bezpečná testovací data.
+  Prověř mapované porty a efektivní dostupnost po startu/restartu a ukončení.
+  Reporty/harness bez mandátu nezveřejňuj ani neposílej do externí služby.
 
-## G. Manuální testy ownera (co agent nezvládne za tebe)
+## G. Ověření z perspektivy uživatele
 
-Inspirováno vrstvou „manual-checklist" z benavlabs/vibe-check: některé kontroly vyžadují
-člověka s prohlížečem a druhým účtem. Periodicky (a po každé větší změně přístupů):
+Podle změny proveď v izolovaném prostředí: druhou identitu/roli, odhlášený přístup,
+přímé API bez UI, přerušené načítání, dva zapisovatele a obnovu po chybě.
+Automatizace je platná, pokud zachovává skutečnou roli, prostředí a průkaznost.
+Lidský test doplň tam, kde rozhoduje srozumitelnost nebo skutečný browserový tok;
+povinného owner kroku se drž podle místního kontraktu.
 
-- Druhý účet: přihlas se jako jiný uživatel/role a zkus přes URL/ID otevřít cizí záznamy
-  (IDOR test v reálném prohlížeči, ne jen v SQL).
-- Odhlášený stav: zkus přímé URL na chráněné routy a přímé volání API s anon klíčem.
-- Restore drill: jednou skutečně obnov zálohu do izolovaného prostředí a ověř data.
-- Chybové stavy: vyvolej chybu (neplatný vstup, neexistující route) a sleduj, co uživatel
-  reálně vidí.
-- Porucha uprostřed načtení: vypni síť (DevTools offline) nebo zablokuj API po otevření
-  plochy a sleduj — uvidíš chybu, nebo prázdnou plochu, která vypadá jako „žádná data"?
-- Dva prohlížeče nad jedním záznamem: oba otevřou, oba uloží. Přežila změna prvního,
-  nebo tiše zmizela?
+## H. Podmíněně: aplikace sama používá LLM / agenta
 
-## Jak checklist používat
+Samotné AI-asistované programování tuto sekci neaktivuje.
 
-1. Před nasazením projdi relevantní sekce (minimálně A, B, E u každého deploye; C, D podle
-   povahy změny; F periodicky a při auditu).
-2. Každé „ne" u 🔴 = stop. Každé „ne" u 🟡 bez zapsaného rozhodnutí = stop, dokud rozhodnutí
-   nevznikne (stačí řádek v dokumentu invariantů, nebo ADR, pokud je to load-bearing).
-3. Nálezy, které nejsou blokující, ale zaslouží fix → backlog s vlastníkem, ne TODO v kódu.
-4. Čistý výsledek jednorázové kontroly převeď na trvalé pravidlo (lint, CI assert, smoke).
-   Jinak se příští rok zhorší a nikdo si nevšimne — dobrý výsledek je důvod pravidlo
-   zafixovat, ne kontrolu zahodit.
-5. Prahy naměřené na jednom projektu (délka URL, strop řádků, šířka rozpadu layoutu) se
-   nepřenášejí; přenáší se metoda, kterou se hrana najde.
+- **H1 🔴** Obsah uživatele, RAG, webu a tool output nemůže změnit serverové oprávnění.
+  Oprávnění se ověřuje mimo model pro uživatele i každý nástroj/tenant.
+  „Ignore previous instructions“ filtr ani systémový prompt nejsou bezpečnostní hranice.
+- **H2 🔴** Výstup modelu jde přes validaci před SQL/shell/HTML/API akcí;
+  nástroje mají omezené cíle a rozsah. Citlivé efekty respektují místní schvalovací proces.
+- **H3 🟡** Limity počtu kroků, času, nákladů a egress, korelovaná stopa volání,
+  bezpečné zastavení a zrušení. Změna modelu/promptu/tool konfigurace vyvolá
+  opakování relevantních adversariálních scénářů.
+
+## I. Výkon a škálovatelnost
+
+Audit projektu/vydání vždy vyhodnotí následující body; u změny podle dopadu.
+Postup, pole důkazu a volba nástrojů: [prověrka výkonu](performance-scalability.md).
+Závažnost podle kritičnosti toku: kritický nesplněný/neověřený požadavek je 🔴,
+ostatní výkonový dluh 🟡. Chybějící měření se uvádí UNKNOWN, nikoli N/A.
+
+- **I1 — kontrakt:** úlohy, kritéria a status jejich schválení, data/růst, mix práce,
+  síť/zařízení a prostředí. Chybějící požadavek evidován i mimo existující spec.
+- **I2 — celý tok:** čas do použitelného výsledku a dokončení, requesty/objem/render,
+  backend/DB/zdroje. Skóre stránky ani SQL p95 nejsou end-to-end důkaz.
+- **I3 — platná zátěž:** model příchodů, plánovaná/odstartovaná/dokončená práce,
+  chyby/timeouty/dropped práce, hranice měření a zdraví generátoru.
+- **I4 — růst a zotavení:** zdůvodněné datové a zátěžové body, skew/cache,
+  špička/delší běh/mez podle rizika a návrat do normálu; vynechání zdůvodněno.
+- **I5 — platný výsledek:** integrita a úplnost při tlaku, počet vzorků/interval,
+  opakování/variabilita, obě populace úspěchů i selhání a limity přenosu důkazu.
+- **I6 — rozhodnutí:** výsledek po tocích, rozsah ověřené kapacity a neověřené oblasti,
+  konkrétní náprava/ověření; přijetí rizika nepřepíše UNKNOWN či FAIL.

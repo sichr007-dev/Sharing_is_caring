@@ -1,161 +1,185 @@
-# Zdroje — anotovaná bibliografie
+# Zdroje a rozhodnutí o jejich použití
 
-Co skill tvrdí a o co se to opírá. U každého zdroje je jedna věta, **co pro skill dokládá**,
-aby šlo při příští revizi ověřit, jestli tvrzení ještě platí. Stav ověření: 2026-09-13.
-Pozor na verze: arXiv preprinty se mění (2606.23130 změnil klíčová čísla mezi v1 a v3);
-citovat vždy s verzí a datem.
+Rozšíření **1.3.0** o výkon/škálovatelnost má vlastní
+[registr výzkumu, nástrojů a diskusí](performance-sources.md). Níže zůstává
+důkazní základ revize 1.2.0; jeho zdroje nebyly touto rozšiřující rešerší všechny znovu ověřovány.
 
-## A. Bezpečnost AI-generovaného kódu — empirie
+Revize: **2026-10-18**, skill **1.2.0**. Jde o cílenou aktualizační rešerši,
+nikoli systematický přehled veškeré literatury ani certifikaci bezpečnosti projektu.
+U webových dokumentací je datum revize datem přístupu; neznamená datum publikace.
+U GitHubu je níže cesta a větev; tyto zdroje nejsou pinované na commit.
 
-- **Deng, Fan, Meng — *Understanding the (In)Security of Vibe-Coded Applications***,
-  arXiv:2606.23130, v3 2026-09-05. https://arxiv.org/abs/2606.23130
-  Korpus 10 517 vibe-coded aplikací, hloubkový audit 200 nasazených: 91,0 % s aspoň jednou
-  zranitelností, 65,77 % nálezů Critical/High; osm opakujících se failure modes odvozených ze
-  tří limitů agentů (memory / objective / knowledge defects). **Dokládá:** defektní třídy 1–3
-  a rámování „mechanismus, ne kategorie zranitelnosti". Lepší harness a prompting incidenci
-  snižují, riziko neodstraňují.
-- **Zhao et al. — *Is Vibe Coding Safe? Benchmarking Vulnerability of Agent-Generated Code in
-  Real-World Tasks* (SUSVIBES)**, arXiv:2512.03262, ICML 2026. https://arxiv.org/abs/2512.03262
-  186 feature-request úloh z reálných projektů: u nejlepší konfigurace 57 % řešení funkčně
-  správných, jen 11,8 % bezpečných; hinty o zranitelnostech nepomohly. **Dokládá:** lokální
-  správnost ≠ systémová správnost — jádro motivace skillu.
-- **Veracode — *2026 GenAI Code Security Report***, 2026-07-28.
-  https://www.veracode.com/resources/analyst-reports/2026-genai-code-security-report/
-  100+ modelů, čtyři měřicí vlny od 2025: průměrný security pass rate 56 %, beze změny
-  meziročně; nejlepší model 68 %. **Dokládá:** zlepšení modelů nepřináší zlepšení bezpečnosti
-  výstupu; gate je potřeba nezávisle na modelu.
-- **Cloud Security Alliance — *Vibe Coding's Security Debt: The AI-Generated CVE Surge***,
-  research note, 04/2026. https://labs.cloudsecurityalliance.org/research/csa-research-note-ai-generated-code-vulnerability-surge-2026/
-  CVE atribuované AI kódu: 2,74× meziroční nárůst v Q1 2026; AI-asistovaní vývojáři commitují
-  3–4× rychleji a zavádějí bezpečnostní nálezy 10× častěji. **Dokládá:** dluh roste rychleji,
-  než se splácí — argument pro gate před nasazením, ne po něm.
-- **Liu et al. — *Debt Behind the AI Boom: A Large-Scale Empirical Study of AI-Generated Code
-  in the Wild***, arXiv:2603.28592, 03–04/2026. https://arxiv.org/abs/2603.28592
-  302 600 ověřených AI commitů z 6 299 repozitářů: 23 % zavedených problémů přetrvává
-  v aktuální verzi. **Dokládá:** co projde, zůstane — ráčna invariantů a trvalá pravidla
-  místo jednorázových kontrol.
-- **Nogueira, Vieira, Campos — *Unreliable in Practice? A Comprehensive Study of Errors in
-  LLM-Generated Code***, arXiv:2608.00661, ISSRE 2026. https://arxiv.org/abs/2608.00661
-  86 726 chybných vzorků od sedmi LLM: generovaný kód často vynechává základní validaci
-  vstupů a bezpečnostní kontroly; i největší modely dělají jednoduché chyby. **Dokládá:**
-  stop-ship D (runtime validace na hranici) a třídu 3 (nevyslovené požadavky).
+## Jak vážit důkazy
 
-## B. Tiché selhání a ošetření chyb
+- Primární studie dokládá výsledek ve svém vzorku; nikoli četnost vad všech dnešních modelů
+  či konkrétního projektu. Rozlišuj napadení za běhu a nález statického scanneru.
+- Oficiální standard/dokumentace dokládá požadavek nebo chování dané technologie/verze.
+  OWASP Top 10 je přehled rizik; ASVS poskytuje ověřovací požadavky. Gate není plný ASVS audit.
+- Vendor benchmark je primární měření výrobce s jeho testy a omezeními.
+- GitHub skill je inspirace provedením, nikoli důkaz účinnosti nebo statistika.
+- Reddit je zkušenostní signál s neověřenou identitou a samovýběrem.
+  Technické pravidlo podepři nezávislým primárním zdrojem.
+- Projektové incidenty v ostatních referencích jsou anonymizované zkušenosti, nikoli
+  nezávisle publikovaná data. Kandidátní pravidlo nesmí přepsat projektový kontrakt.
 
-- **Yuan et al. — *Simple Testing Can Prevent Most Critical Failures: An Analysis of
-  Production Failures in Distributed Data-Intensive Systems***, USENIX OSDI 2014.
-  https://www.usenix.org/system/files/conference/osdi14/osdi14-paper-yuan.pdf
-  198 produkčních selhání (Cassandra, HBase, HDFS, MapReduce, Redis): **92 % katastrofických
-  selhání = špatné ošetření nefatální, explicitně signalizované chyby**; ~⅓ triviálně
-  odhalitelných inspekcí (prázdný handler, abort v over-catch, TODO); 77 % reprodukovatelných
-  unit testem; statický checker Aspirator našel 500 nových chyb. **Dokládá:** defektní třída 4
-  není okrajová a levné kontroly ji chytají.
-- **OWASP Top 10:2025 — A10 *Mishandling of Exceptional Conditions***, 11/2025, finální 01/2026.
-  https://top10.owasp.org/2025/A10_2025-Mishandling_of_Exceptional_Conditions
-  Nová kategorie, 24 CWE (mj. CWE-636 Failing Open, CWE-234 Failure to Handle Missing
-  Parameter, CWE-209 chybová hláška s citlivými daty). Prevence: chytat chybu tam, kde
-  vzniká, a ošetřit smysluplně; fail closed; rollback transakcí; centralizované ošetření.
-  **Dokládá:** třída 4 a stop-ship D.
-- **Wu — *When Errors Become Narratives: A Longitudinal Taxonomy of Silent Failures in a
-  Production LLM Agent Runtime***, arXiv:2606.14589, 06/2026. https://arxiv.org/abs/2606.14589
-  22 incidentů s postmortemy; pět tříd tichých selhání (prostředí, nesoulad návrhových
-  předpokladů, **error swallowing and dilution**, řetězená halucinace, provozní slepé skvrny);
-  ~70 % odhalil člověk, ne testy; latence odhalení 13 h – 60 dní; doporučení „loud,
-  attributable, boring failures". **Dokládá:** třída 4, §6 chyb detekce, a proč se ticho
-  neeskaluje jako incident.
-- **Basiri et al. — *Chaos Engineering***, IEEE Software 2016; *Principles of Chaos
-  Engineering*, https://principlesofchaos.org/
-  Hypotéza o ustáleném stavu, reálné poruchy, minimalizace vedlejších účinků. **Dokládá:**
-  matici porucha × plocha jako legitimní auditní nástroj — a proč se ptá na uživatelsky
-  viditelný dopad, ne na vnitřní stav.
+Číselné výsledky níže se nesčítají ani nesrovnávají jako jedna metrika bezpečnosti.
 
-## C. Souběh a ztracený zápis
+## Primární studie a novější empirie
 
-- **Kleppmann — *Designing Data-Intensive Applications***, O'Reilly 2017, kap. 7
-  „Preventing Lost Updates". Read-modify-write cyklus, atomické operace, explicitní zámky,
-  compare-and-set (`UPDATE … WHERE id = ? AND version = ?`), automatická detekce ztracených
-  zápisů. **Dokládá:** stop-ship C položku o ztraceném zápisu a heuristiku testu dvou sezení.
-- **Supabase discussion #40482** (Storage versioning / edit locking), doporučení používat
-  Postgres: optimistický update přes `WHERE version = X`, nebo tabulku zámků.
-  https://github.com/orgs/supabase/discussions/40482
-  **Dokládá:** v BaaS bez dlouhých transakcí je compare-and-set jediná praktická cesta;
-  `SELECT … FOR UPDATE` přes auto-commit API nedrží.
+**P01 — Deng, Fan, Meng: Understanding the (In)Security of Vibe-Coded Applications.**
+[arXiv:2606.23130v4](https://arxiv.org/abs/2606.23130v4), 2026-09-14.
+V4 uvádí korpus 9 041 aplikací; audit 200 veřejně nasazených, 1 186 zranitelností,
+91,0 % auditovaných aplikací s nálezem a 65,77 % nálezů Critical/High.
+Proti starému seznamu se mění korpus 10 517 → 9 041, nikoli zde uvedené dva podíly.
+**Použití:** zachovat první tři optiky; označit je jako praktickou interpretaci
+memory/objective/knowledge defects. Omezení: vybraný vzorek konkrétních nástrojů,
+ne odhad bezpečnosti všech AI projektů.
 
-## D. Limity stacku (Supabase-style)
+**P02 — Zhao et al.: Is Vibe Coding Safe? (SUSVIBES).**
+[arXiv:2512.03262v4](https://arxiv.org/abs/2512.03262v4), 2026-09-21; ICML 2026.
+186 úloh z projektů s historicky zranitelnými implementacemi, 12 konfigurací agentů.
+Uváděných 57 % funkčně správných a 11,8 % bezpečných řešení se týká jedné konfigurace,
+nikoli „nejlepší bezpečnosti všech agentů“. **Použití:** funkční průchod nenahrazuje
+bezpečnostní důkaz. Výběr úloh není reprezentativní pro libovolnou aplikaci.
 
-- **PostgREST — konfigurace `db-max-rows`**, https://docs.postgrest.org/en/stable/references/configuration.html
-  „A hard limit to the number of rows PostgREST will fetch from a view, table, **or
-  function**. Limits payload size for accidental or malicious requests." Výchozí ∞; Supabase
-  nastavuje per projekt (typicky 1000). **Dokládá:** tichý ořez platí i pro RPC; limit je
-  ochrana, zvednutí stropu místo stránkování je třída 2.
-- **PostgREST — stránkování a count**, https://docs.postgrest.org/en/stable/references/api/pagination_count.html
-  `Prefer: count=exact|planned|estimated`, `Content-Range`, 206 Partial Content. **Dokládá:**
-  detekce ořezu je možná jen s explicitním počtem nebo stránkováním, ne z tvaru odpovědi.
-- **postgrest-js issues #393, #423** — `.in()` filtr s větším seznamem ID → „URI too long"
-  (414) z brány; doporučení POST / RPC / dávkování.
-  https://github.com/supabase/postgrest-js/issues/393 · https://github.com/supabase/postgrest-js/issues/423
-  **Dokládá:** třída 4 „tvrdý limit infrastruktury bez odpovědi" a stop-ship D položku o
-  filtrech ze seznamu ID.
+**P03 — Khalid et al.: (Don't) Trust, but (Don't) Verify.**
+[arXiv:2609.21020v1](https://arxiv.org/abs/2609.21020v1),
+[výsledky v plném textu](https://arxiv.org/html/2609.21020v1), 2026-09-17.
+Pozorovací studie 100 účastníků nad čtyřmi úlohami v C: výběr nerozlišoval spolehlivě
+bezpečnější návrhy; časté byly povrchní indicie a důraz na funkčnost/styl.
+**Použití:** review má vyžadovat důkaz chování a identifikaci skutečné hranice.
+Omezení: C linked-list úlohy; studie nedokazuje obecnou neschopnost lidského review
+ani úspěšnost konkrétního webového gate.
 
-## E. Metodika měření
+**P04 — Surikov: Securing AI-Generated Code: A Just-in-Time Vulnerability Detection
+and Remediation Pipeline.**
+[arXiv:2608.16187v1](https://arxiv.org/abs/2608.16187v1), 2026-08-17.
+Malý Python experiment nad 26 prompty kombinuje CodeQL, Bandit a LLM validátor;
+opravy někdy zavádějí nové nálezy. **Použití:** po opravě prověřit regrese a varianty.
+Omezení: studentský preprint, převážně statické nálezy; pokles nálezů není důkaz
+plošné runtime bezpečnosti. Nepřebíráme univerzální procenta ani předepsaný toolchain.
 
-- **van der Kouwe et al. — *Benchmarking Crimes: An Emerging Threat in Systems Security***,
-  arXiv:1801.02381; rozšířeno jako *SoK: Benchmarking Flaws in Systems Security*, IEEE
-  EuroS&P 2019. https://arxiv.org/abs/1801.02381
-  22 „benchmarking crimes" (chybějící baseline, nespecifikovaná platforma, selektivní
-  metriky…) v 50 špičkových pracích. **Dokládá:** §6 chyb detekce — měřicí přístroj má
-  vlastní chybu a musí ji zapisovat; a pravidlo „metrika bez jediné definice se nepoužívá
-  jako kritérium" (dvě měření duplicity na témže kódu dají různá čísla, když měří jiný rozsah).
+**P05 — Vero et al.: BaxBench.**
+[arXiv:2502.11844v3](https://arxiv.org/abs/2502.11844v3), 2025-05-30.
+392 backend úloh, oddělené funkční testy a end-to-end exploity.
+**Použití:** oddělit funkční a adversariální ověření, zachovat legitimní kontrolní případ.
+Jde o starší doplnění mezery v bibliografii, ne novou událost po září 2026.
 
-## F. Supply chain a publikovaný artefakt
+**P06 — Spracklen et al.: We Have a Package for You!**
+[USENIX Security 2025](https://www.usenix.org/conference/usenixsecurity25/presentation/spracklen).
+Studie halucinovaných balíčků napříč 16 modely a dvěma jazyky.
+**Použití:** původ a identitu balíčku ověřovat nezávisle na doporučení LLM.
+Starší měření není aktuální míra halucinací dnešního modelu.
 
-- **OWASP Top 10:2025 — A03 *Software Supply Chain Failures***, https://top10.owasp.org/
-  Nová kategorie; SSRF sloučeno do Broken Access Control. **Dokládá:** stop-ship F položky
-  o závislostech.
-- **Shai-Hulud / ChainDrop — vlny samošířících se npm červů, 2025–2026.** CSA Singapore
-  advisory AD-2026-009 (https://www.csa.gov.sg/alerts-and-advisories/advisories/ad-2026-009/);
-  Datadog Security Labs (https://securitylabs.datadoghq.com/articles/npm-worm-compromises-popular-npm-packages/);
-  Unit 42 *The npm Threat Landscape* (aktualizace 2026-07-15,
-  https://unit42.paloaltonetworks.com/monitoring-npm-supply-chain-attacks/); CISA alert
-  k axios 2026-04-20. Kompromitace `keyv` a dalších 2026-08-04; přes 1 300 verzí balíčků;
-  exfiltrace cloud credentials, **konfigurací AI agentů**, perzistence přes Claude Code hooks
-  a VS Code `tasks.json`; jeden token maintainera → stovky otrávených balíčků bez lidského
-  zásahu. **Dokládá:** nový vektor od 07/2026 — instalace z lockfile, cooldown nových verzí,
-  audit postinstall skriptů, klíče agentů jako secrets.
-- **Xie — *VibeGuard: A Security Gate Framework for AI-Generated Code — Lessons from the
-  Claude Code Source Leak***, arXiv:2604.01052, 04/2026. https://arxiv.org/abs/2604.01052
-  Incident 2026-03-31: 59,8 MB source map s ~512 000 řádky zdrojáků v publikovaném balíčku —
-  chyba packaging konfigurace, ne logiky. Gate s pěti kategoriemi: hygiena artefaktu, drift
-  packaging konfigurace, expozice source map, hardcodované secrets, supply chain. **Dokládá:**
-  stop-ship A položku o obsahu artefaktu — logický review tuhle třídu nevidí.
+**P07 — Yuan et al.: Simple Testing Can Prevent Most Critical Failures.**
+[USENIX OSDI 2014](https://www.usenix.org/conference/osdi14/technical-sessions/presentation/yuan).
+Produkční selhání distribuovaných systémů zdůrazňují ošetření explicitních chyb.
+**Použití:** čtvrtá optika a cílené fault testy. Přenos do SPA je metodická inference,
+nikoli doklad stejné četnosti selhání ve webových aplikacích.
 
-## G. Agentní vektory (relevantní pro aplikace, které samy volají LLM)
+**P08 — Nogueira, Vieira, Campos: Unreliable in Practice?**
+[arXiv:2608.00661v1](https://arxiv.org/abs/2608.00661v1), 2026-08-01, ISSRE 2026.
+Korpus chybových vzorků ve čtyřech kompilovaných jazycích popisuje i vynechanou validaci.
+**Použití:** podpůrná motivace vstupních a resource kontrol; vzorek již chybných programů
+není prevalence chyb mezi všemi generovanými programy.
 
-- **OWASP Top 10 for Agentic Applications 2026**, 2025-12-09.
-  https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/
-  ASI01 Goal Hijack, ASI02 Tool Misuse, ASI03 Identity & Privilege Abuse, ASI04 Agentic
-  Supply Chain, ASI05 Unexpected Code Execution, ASI06 Memory/Context Poisoning, ASI07
-  Inter-Agent Communication, ASI08 Cascading Failures, ASI09 Human-Agent Trust, ASI10 Rogue
-  Agents. **Dokládá:** stop-ship D položku pro aplikace s LLM funkcemi. Mimo scope gate jako
-  celek — katalog „co je rozbité", ne mechanismus vzniku.
-- **Cloud Security Alliance — *Agentjacking: MCP Injection Hijacks AI Coding Agents***,
-  research note 2026-06-12. https://labs.cloudsecurityalliance.org/research/csa-research-note-agentjacking-mcp-sentry-injection-20260612/
-  Nepřímá prompt injection přes obsah, který agent čte (issue, ticket, log) → vytvoření
-  škodlivé MCP konfigurace → RCE. **Dokládá:** riziko na straně *nástroje*, kterým se skill
-  spouští: subagenti a auditní prompty čtou obsah cizího repa jako data, ne jako instrukce.
+**V01 — Veracode: 2026 GenAI Code Security Report.**
+[Report](https://www.veracode.com/resources/analyst-reports/2026-genai-code-security-report/),
+[shrnutí výrobce](https://www.veracode.com/blog/2026-genai-code-security-report-ai-risk/),
+2026-07-28. Výrobce uvádí průměrný pass rate 56 % v jeho sadě bezpečnostních úloh.
+**Použití:** funkční pokrok nelze automaticky přenášet na bezpečnost.
+Není to nezávislý populační odhad; nepřidává nové pravidlo oproti P01/P02.
 
-## H. Komplementy (ne zdroje tvrzení)
+## Standardy a oficiální dokumentace → konkrétní kontroly
 
-- **benavlabs/vibe-check** — https://github.com/benavlabs/vibe-check — inspirace pro vrstvu
-  manuálních kontrol člověkem (stop-ship G).
-- **supabase/agent-skills** — `npx skills add supabase/agent-skills` — oficiální vzory pro
-  auth, klienty, SSR; architektonická vrstva, kterou gate záměrně neduplikuje.
+- **S01 [OWASP ASVS 5.0.0](https://owasp.org/projects/asvs)**:
+  ověřitelné požadavky a verzované odkazy → B/D/F. Verzi ASVS u konkrétního mapování uvést;
+  tento skill netvrdí pokrytí celé úrovně ASVS.
+- **S02 [OWASP Top 10:2025](https://top10.owasp.org/2025/)**:
+  A03 Software Supply Chain Failures a A10 Mishandling of Exceptional Conditions
+  → F1–F3 a čtvrtá optika.
+- **S03 [OWASP API4:2023](https://api-security.owasp.org/editions/2023/en/0xa4-unrestricted-resource-consumption/)**:
+  objem, čas, rate a náklady externích služeb → D5; limity podle business potřeb.
+- **S04 [OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)**:
+  automaticky přikládané credentials a volba ochrany podle mechanismu → B5.
+  Nepřebíráme univerzální soud o každé SPA nebo samotném CORS.
+- **S05 [Supabase API keys](https://supabase.com/docs/guides/getting-started/api-keys)**:
+  publishable/anon vs. secret/service_role, aplikační klíč vs. uživatelská identita
+  → A2/B1. Cloudový plán deprecace legacy klíčů automaticky nepřenášet na self-hosted stack.
+- **S06 [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security)**:
+  grants + policies, exposed schemas a efektivní identita views → B2/B3.
+  security_invoker u views má verzové podmínky; místní ratifikované výjimky mají kontext.
+- **S07 [PostgREST pagination/count](https://docs.postgrest.org/en/stable/references/api/pagination_count.html),
+  [db-max-rows](https://docs.postgrest.org/en/stable/references/configuration.html#db-max-rows)**:
+  range/count, limity a cena exact count → D4. V revizi dokumentace odpovídala PostgREST 16;
+  nasazenou verzi a konfiguraci je nutné ověřit.
+- **S08 [npm ci, CLI v11](https://docs.npmjs.com/cli/v11/commands/npm-ci/)**:
+  lockfile a řízení lifecycle skriptů → F1/F3.
+  Volby allowScripts/ignore-scripts jsou verzově závislé; samotný lockfile není bezpečnostní audit.
+- **S09 [GitHub Actions secure use](https://docs.github.com/en/actions/reference/security/secure-use)**:
+  omezení tokenů, nedůvěryhodné vstupy a ověřený plný SHA → F3.
+- **S10 [Stripe webhook endpoints](https://docs.stripe.com/events/manage-webhook-endpoints)**:
+  podpis, raw payload podle protokolu a duplicitní události → C3.
+  Princip přenášíme na jiné poskytovatele přes jejich dokumentaci, ne přes Stripe syntaxi.
+- **S11 [OWASP Agentic Top 10 2026](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/)**:
+  hranice instrukce/data, oprávnění nástrojů a řetězení efektů → podmíněná H.
+- **S12 [OWASP Agent Control Standard](https://genai.owasp.org/resource/agent-control-standard-acs/)**,
+  stránka z 2026-09-01: runtime enforcement přes kontrolní body → H1/H2.
+  Zachyceno jako nový doplněk; nevyžaduje konkrétní framework ani implementaci ACS.
 
-## Jak s tímto seznamem pracovat
+## Podobné skilly — metoda, nikoli převzatý kód
 
-1. Při revizi skillu projít A–G a ověřit, zda citovaná čísla a verze ještě platí (arXiv
-   verze, roční reporty).
-2. Nový zdroj se přidává jen s větou „co dokládá pro skill". Zdroj bez vazby na konkrétní
-   pravidlo skillu sem nepatří.
-3. Prahové hodnoty z jednotlivých studií nebo projektů (1000 řádků, 8 kB URL…) jsou
-   ilustrace stacku, ne pravidla. Pravidlem je metoda, kterou se hrana najde.
+- **G01 [benavlabs/vibe-check](https://github.com/benavlabs/vibe-check),
+  [SKILL.md](https://github.com/benavlabs/vibe-check/blob/main/skills/vibe-check/SKILL.md)**:
+  vnější scan a kódové review mají jiné pokrytí; scanner není celý audit.
+  Převzata myšlenka explicitně přiznat nepokryté plochy a rozdíl localhost/host.
+  Nepřebíráme plošné FAIL pro source mapy, každý veřejný klíč nebo wildcard.
+- **G02 [Trail of Bits differential-review](https://github.com/trailofbits/skills/blob/master/plugins/differential-review/skills/differential-review/SKILL.md)**:
+  hloubka podle rizika, kontext historie a dopad na volající → gate/review.
+- **G03 [Trail of Bits fp-check](https://github.com/trailofbits/skills/blob/master/plugins/fp-check/skills/fp-check/SKILL.md),
+  [post-patch-validation](https://github.com/trailofbits/skills/blob/master/plugins/post-patch-validation/skills/post-patch-validation/SKILL.md)**:
+  konkrétní předpoklady nálezu, pokus o vyvrácení, dosažení testované cesty a baseline/patch
+  → verification. Inspirace principem; nepřebíráme runner, marker, povinné delegace či formát.
+- **G04 [supabase/agent-skills](https://github.com/supabase/agent-skills)**:
+  potvrzené oddělení obecného gate od stackové hloubky → routing v hlavním skillu.
+  Nic neinstalováno. Oficiální dokumentace rozhoduje o technickém chování.
+
+## Komunitní signály — nepoužívat jako míru rizika
+
+- **C01 [How are you handling security…](https://www.reddit.com/r/vibecoding/comments/1uiu1c5/how_are_you_handling_security_in_your_vibecoded/)**:
+  debata od 2026-06-29; témata runtime vs. source audit, deterministické kontroly
+  a přehnané „opravy“ architektury. Vazba: P03/P05 a G02/G03; žádná tvrzení o četnosti.
+- **C02 [Solving the citizen developer SDLC](https://www.reddit.com/r/EngineeringManagers/comments/1woj75v/solving_the_citizen_developer_sdlc/)**:
+  diskuse 2026-09; odpovědnost a hranice sandbox/produkce. Vazba: smlouva kontroly
+  a místní mandát; samostatně nedokládá účinnost postupu.
+- **C03 [VibeCoding Security Playbook](https://www.reddit.com/r/AskVibecoders/comments/1rp954n/vibecoding_security_playbook/)**:
+  diskuse 2026-03; checklistové rady a izolace prostředí. Nepřebíráme rady, že samotný
+  NODE_ENV nebo prompt zajistí oddělení prostředí.
+
+## Původní zdroje a tvrzení, která nyní nenesou pravidla
+
+- CSA research note [Vibe Coding's Security Debt](https://labs.cloudsecurityalliance.org/research/csa-research-note-ai-generated-code-vulnerability-surge-2026/)
+  byla otevřena. Je to syntéza jiných měření; původní 2,74× a 10× nepřenášíme,
+  protože jejich přesný původ, jmenovatel a srovnatelnost nebyly v revizi doloženy.
+- CSA [Agentjacking](https://labs.cloudsecurityalliance.org/research/csa-research-note-agentjacking-mcp-sentry-injection-20260612/)
+  byla otevřena. Popisuje zprostředkovanou PoC studii; není důkaz plošného aktivního zneužití.
+  Bezpečnost auditora v této verzi podpírají primárně S09/S11.
+- [Singapore CSA AD-2026-009](https://www.csa.gov.sg/alerts-and-advisories/advisories/ad-2026-009/)
+  bylo otevřeno, ale čitelný obsah se nepodařilo získat. Podrobnosti o jménech kampaní,
+  počtech verzí a časové ose npm útoků proto netvoří důkazní základ aktualizace.
+- [VibeGuard v1](https://arxiv.org/abs/2604.01052v1) byl ověřen v abstraktu:
+  experiment s osmi syntetickými projekty. Hygiena artefaktu je užitečná; jeho výsledky
+  nepřenášíme jako záruku účinnosti našeho skillu.
+- Wu 2606.14589 a Liu et al. 2603.28592: odkazy otevřeny, nepoužity k novým závěrům;
+  podrobná metodika/číselné závěry nebyly v této revizi znovu posouzeny.
+- Kleppmann kap. 7, Supabase discussion #40482, postgrest-js #393/#423, Principles of Chaos
+  Engineering a Benchmarking Crimes: historický kontext. Plné podklady nebyly nově ověřeny;
+  původní kategorické „CAS je jediná praktická cesta“ se ruší. Pravidla se opírají o
+  konkrétní invariant/test a oficiální dokumentaci, ne o tuto výlučnost.
+
+## Příští revize
+
+Při zásadní změně stacku/modelového runtime nebo novém relevantním incidentu ověř dotčené
+pravidlo; nespoléhej na kalendářní stáří jako důkaz zastaralosti.
+U nového zdroje uveď verzi/datum, metodu, omezení a konkrétní rozhodnutí pro skill.
+Novinku, doplnění staré mezery, opravu tvrzení a změnu místního projektu označ odlišně.
